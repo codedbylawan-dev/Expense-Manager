@@ -21,11 +21,24 @@ app.use(express.json());
 
 // Serve static files from the React app build folder in production
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../frontend/build')));
+  const buildPath = path.join(__dirname, '../frontend/build');
+
+  app.use(express.static(buildPath));
 
   app.get('*', (req, res, next) => {
+    // Skip API routes
     if (req.path.startsWith('/api')) return next();
-    res.sendFile(path.join(__dirname, '../frontend/build/index.html'));
+
+    const indexPath = path.join(buildPath, 'index.html');
+
+    // Check if build folder exists
+    if (!require('fs').existsSync(indexPath)) {
+      console.error(`❌ Deployment Error: Frontend build folder is missing at ${buildPath}.`);
+      console.error(`💡 Ensure your Render "Build Command" is set to "npm run build" in the root directory.`);
+      return res.status(500).send('Frontend build folder is missing. Check server logs.');
+    }
+
+    res.sendFile(indexPath);
   });
 }
 
