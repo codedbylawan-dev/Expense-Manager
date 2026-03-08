@@ -1,11 +1,12 @@
 require('dotenv').config();
 
-const express     = require('express');
-const cors        = require('cors');
-const authRoutes  = require('./routes/auth');
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+const authRoutes = require('./routes/auth');
 const transRoutes = require('./routes/transactions');
 
-const app  = express();
+const app = express();
 const PORT = process.env.PORT || 5000;
 
 // CORS configuration - Allow all in development, restrict in production if needed
@@ -21,14 +22,14 @@ app.use(express.json());
 // Serve static files from the React app build folder in production
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../frontend/build')));
-  
+
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api')) return next();
     res.sendFile(path.join(__dirname, '../frontend/build/index.html'));
   });
 }
 
-app.use('/api/auth',         authRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/transactions', transRoutes);
 
 app.use((req, res) => res.status(404).json({ error: 'Route not found.' }));
