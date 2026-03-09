@@ -1,42 +1,49 @@
-// Load environment variables from .env file
+// Load environment variables
 require('dotenv').config();
 
-// Import required packages
+// Import packages
 const express = require('express');
 const cors = require('cors');
 
-// Import route files
+// Import routes
 const authRoutes = require('./routes/auth');
 const transactionRoutes = require('./routes/transactions');
 
-// Create Express application
 const app = express();
-
-// Server port (Render provides PORT automatically in production)
 const PORT = process.env.PORT || 5000;
 
 /*
 |--------------------------------------------------------------------------
 | CORS Configuration
 |--------------------------------------------------------------------------
-| Allows requests from the frontend application.
-| In production, FRONTEND_URL should be set in environment variables.
+| Allow both local development and deployed frontend.
 */
-const corsOptions = {
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true
-};
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://expense-manager-one-murex.vercel.app"
+];
 
-// Apply middlewares
-app.use(cors(corsOptions));      // Enable CORS
-app.use(express.json());         // Parse JSON request bodies
+app.use(cors({
+  origin: function (origin, callback) {
+    // allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
+    } else {
+      return callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true
+}));
+
+// Parse JSON requests
+app.use(express.json());
 
 /*
 |--------------------------------------------------------------------------
-| Health Check Route
+| Health Check
 |--------------------------------------------------------------------------
-| Simple route to confirm the API server is running.
-| Useful for deployment checks (Render, monitoring tools, etc.)
 */
 app.get('/', (req, res) => {
   res.send('Expense Manager API is running');
@@ -46,8 +53,6 @@ app.get('/', (req, res) => {
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
-| All authentication and transaction routes are defined separately
-| inside the routes folder for better project structure.
 */
 app.use('/api/auth', authRoutes);
 app.use('/api/transactions', transactionRoutes);
@@ -56,8 +61,6 @@ app.use('/api/transactions', transactionRoutes);
 |--------------------------------------------------------------------------
 | 404 Handler
 |--------------------------------------------------------------------------
-| If a request does not match any defined route,
-| this middleware returns a "Route not found" response.
 */
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found.' });
@@ -67,11 +70,9 @@ app.use((req, res) => {
 |--------------------------------------------------------------------------
 | Global Error Handler
 |--------------------------------------------------------------------------
-| Catches unexpected errors in the application and returns
-| a generic error response while logging details to the server.
 */
 app.use((err, req, res, next) => {
-  console.error('Server Error:', err);
+  console.error("Server Error:", err.message);
   res.status(500).json({ error: 'Something went wrong.' });
 });
 
@@ -79,7 +80,6 @@ app.use((err, req, res, next) => {
 |--------------------------------------------------------------------------
 | Start Server
 |--------------------------------------------------------------------------
-| Launch the Express server on the specified port.
 */
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
