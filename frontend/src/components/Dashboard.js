@@ -4,8 +4,7 @@ import TransactionCard from './TransactionCard';
 import Charts from './Charts';
 import { exportToCSV } from '../utils/exportCSV';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-const API = `${API_URL}/api`;
+const API = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
 
 const EMPTY_SUMMARY = {
   totalIncome: 0, totalExpense: 0, balance: 0,
