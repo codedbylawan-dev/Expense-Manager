@@ -1,210 +1,367 @@
-import { useState, useEffect } from 'react';
-import AddTransaction from './AddTransaction';
-import TransactionCard from './TransactionCard';
-import Charts from './Charts';
-import { exportToCSV } from '../utils/exportCSV';
+import { useState, useEffect } from "react";
+import AddTransaction from "./AddTransaction";
+import TransactionCard from "./TransactionCard";
+import Charts from "./Charts";
+import { exportToCSV } from "../utils/exportCSV";
 
 const API = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
 
 const EMPTY_SUMMARY = {
-  totalIncome: 0, totalExpense: 0, balance: 0,
-  expenseByCategory: {}, incomeByCategory: {}, monthlyData: []
+  totalIncome: 0,
+  totalExpense: 0,
+  balance: 0,
+  expenseByCategory: {},
+  incomeByCategory: {},
+  monthlyData: []
 };
 
 function Dashboard() {
+
   const [transactions, setTransactions] = useState([]);
   const [summary, setSummary] = useState(EMPTY_SUMMARY);
-  const [filter, setFilter] = useState('all');
-  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [showCharts, setShowCharts] = useState(true);
   const [loading, setLoading] = useState(true);
 
-  const username = localStorage.getItem('username') || 'there';
-  const token = localStorage.getItem('token');
-  const headers = { Authorization: `Bearer ${token}` };
+  const username = localStorage.getItem("username") || "User";
+  const token = localStorage.getItem("token");
+
+  // Redirect if token missing
+  if (!token) {
+    window.location.href = "/login";
+    return null;
+  }
+
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json"
+  };
 
   const fetchAll = async () => {
     try {
-      const [tRes, sRes] = await Promise.all([
+
+      const [transactionsRes, summaryRes] = await Promise.all([
         fetch(`${API}/transactions`, { headers }),
-        fetch(`${API}/transactions/summary`, { headers }),
+        fetch(`${API}/transactions/summary`, { headers })
       ]);
-      const tData = await tRes.json();
-      const sData = await sRes.json();
-      setTransactions(Array.isArray(tData) ? tData : []);
-      if (sData.totalIncome !== undefined) setSummary(sData);
-    } catch (e) { console.error(e); }
+
+      const transactionsData = await transactionsRes.json();
+      const summaryData = await summaryRes.json();
+
+      if (Array.isArray(transactionsData)) {
+        setTransactions(transactionsData);
+      }
+
+      if (summaryData.totalIncome !== undefined) {
+        setSummary(summaryData);
+      }
+
+    } catch (err) {
+      console.error("Fetch error:", err);
+    }
   };
 
   useEffect(() => {
-    (async () => { await fetchAll(); setLoading(false); })();
+    const loadData = async () => {
+      await fetchAll();
+      setLoading(false);
+    };
+
+    loadData();
   }, []);
 
-  const handleLogout = () => { localStorage.clear(); window.location.href = '/login'; };
+  const handleLogout = () => {
+    localStorage.clear();
+    window.location.href = "/login";
+  };
 
-  const filtered = transactions
-    .filter(t => filter === 'all' || t.type === filter)
+  const filteredTransactions = transactions
+    .filter(t => filter === "all" || t.type === filter)
     .filter(t =>
       t.title.toLowerCase().includes(search.toLowerCase()) ||
       t.category.toLowerCase().includes(search.toLowerCase())
     );
 
-  const balance = summary.balance || 0;
-  const income = summary.totalIncome || 0;
-  const expense = summary.totalExpense || 0;
+  const incomeCount = transactions.filter(t => t.type === "income").length;
+  const expenseCount = transactions.filter(t => t.type === "expense").length;
 
-  const incomeCount = transactions.filter(t => t.type === 'income').length;
-  const expenseCount = transactions.filter(t => t.type === 'expense').length;
-
-  if (loading) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F3F4F6' }}>
-      <div style={{ textAlign: 'center', color: '#6B7280' }}>
-        <div style={{ fontSize: '40px', marginBottom: '12px' }}>⏳</div>
-        <p>Loading your data...</p>
+  if (loading) {
+    return (
+      <div style={styles.loading}>
+        <div>
+          <div style={{ fontSize: 40 }}>⏳</div>
+          <p>Loading your data...</p>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   return (
-    <div style={s.page}>
+    <div style={styles.page}>
+
       {/* Navbar */}
-      <nav style={s.navbar}>
-        <span style={s.logo}>💰 Expense Manager</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <span style={s.greeting}>Hi, <strong>{username}</strong></span>
-          <button style={s.logoutBtn} onClick={handleLogout}>Logout</button>
+      <nav style={styles.navbar}>
+        <span style={styles.logo}>💰 Expense Manager</span>
+
+        <div style={styles.navRight}>
+          <span>Hi, <strong>{username}</strong></span>
+          <button style={styles.logoutBtn} onClick={handleLogout}>
+            Logout
+          </button>
         </div>
       </nav>
 
-      <div style={s.container}>
+      <div style={styles.container}>
 
         {/* KPI Cards */}
-        <div style={s.kpiRow}>
-          <div style={{ ...s.kpiCard, borderTop: '4px solid #059669' }}>
-            <div style={{ ...s.kpiValue, color: '#059669' }}>
-              ₹{income.toLocaleString('en-IN')}
-            </div>
-            <div style={s.kpiLabel}>Total Income</div>
-          </div>
-          <div style={{ ...s.kpiCard, borderTop: '4px solid #EF4444' }}>
-            <div style={{ ...s.kpiValue, color: '#EF4444' }}>
-              ₹{expense.toLocaleString('en-IN')}
-            </div>
-            <div style={s.kpiLabel}>Total Expenses</div>
-          </div>
-          <div style={{ ...s.kpiCard, borderTop: `4px solid ${balance >= 0 ? '#3B82F6' : '#F59E0B'}` }}>
-            <div style={{ ...s.kpiValue, color: balance >= 0 ? '#3B82F6' : '#F59E0B' }}>
-              {balance < 0 ? '-' : ''}₹{Math.abs(balance).toLocaleString('en-IN')}
-            </div>
-            <div style={s.kpiLabel}>{balance >= 0 ? '✅ Balance' : '⚠️ Overspent'}</div>
-          </div>
-          <div style={{ ...s.kpiCard, borderTop: '4px solid #8B5CF6' }}>
-            <div style={{ ...s.kpiValue, color: '#8B5CF6' }}>{transactions.length}</div>
-            <div style={s.kpiLabel}>Total Transactions</div>
-          </div>
+        <div style={styles.kpiRow}>
+
+          <KpiCard label="Total Income" value={summary.totalIncome} color="#059669" />
+          <KpiCard label="Total Expenses" value={summary.totalExpense} color="#EF4444" />
+          <KpiCard label="Balance" value={summary.balance} color="#3B82F6" />
+          <KpiCard label="Transactions" value={transactions.length} color="#8B5CF6" />
+
         </div>
 
         {/* Charts */}
-        {showCharts && transactions.length > 0 && <Charts summary={summary} />}
+        {showCharts && transactions.length > 0 && (
+          <Charts summary={summary} />
+        )}
 
-        {/* Top bar */}
-        <div style={s.topBar}>
-          <h2 style={s.heading}>Transactions</h2>
-          <div style={s.actions}>
-            <button style={s.toggleBtn} onClick={() => setShowCharts(p => !p)}>
-              {showCharts ? '📊 Hide Charts' : '📊 Show Charts'}
+        {/* Top Bar */}
+        <div style={styles.topBar}>
+
+          <h2>Transactions</h2>
+
+          <div style={styles.actions}>
+
+            <button
+              style={styles.toggleBtn}
+              onClick={() => setShowCharts(p => !p)}
+            >
+              {showCharts ? "Hide Charts" : "Show Charts"}
             </button>
-            <button style={s.exportBtn} onClick={() => exportToCSV(transactions)}>
-              ⬇ Export CSV
+
+            <button
+              style={styles.exportBtn}
+              onClick={() => exportToCSV(transactions)}
+            >
+              Export CSV
             </button>
-            <button style={s.addBtn} onClick={() => setShowAdd(true)}>
+
+            <button
+              style={styles.addBtn}
+              onClick={() => setShowAdd(true)}
+            >
               + Add Transaction
             </button>
+
           </div>
         </div>
 
-        {/* Search + Filter */}
-        <div style={s.controls}>
-          <input style={s.search}
-            placeholder="🔍  Search by title or category..."
-            value={search} onChange={e => setSearch(e.target.value)} />
-          <div style={s.filterRow}>
-            {[
-              { key: 'all', label: 'All', count: transactions.length },
-              { key: 'income', label: '⬆ Income', count: incomeCount },
-              { key: 'expense', label: '⬇ Expense', count: expenseCount },
-            ].map(f => (
-              <button key={f.key} onClick={() => setFilter(f.key)} style={{
-                ...s.filterBtn,
-                background: filter === f.key ? '#064E3B' : 'white',
-                color: filter === f.key ? 'white' : '#374151',
-                borderColor: filter === f.key ? '#064E3B' : '#E5E7EB',
-              }}>
-                {f.label}
-                <span style={{
-                  ...s.countBadge,
-                  background: filter === f.key ? 'rgba(255,255,255,0.25)' : '#F3F4F6',
-                  color: filter === f.key ? 'white' : '#6B7280',
-                }}>{f.count}</span>
-              </button>
-            ))}
-          </div>
+        {/* Search */}
+        <input
+          style={styles.search}
+          placeholder="Search transactions..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+
+        {/* Filters */}
+        <div style={styles.filterRow}>
+
+          <FilterBtn
+            label="All"
+            active={filter === "all"}
+            onClick={() => setFilter("all")}
+            count={transactions.length}
+          />
+
+          <FilterBtn
+            label="Income"
+            active={filter === "income"}
+            onClick={() => setFilter("income")}
+            count={incomeCount}
+          />
+
+          <FilterBtn
+            label="Expense"
+            active={filter === "expense"}
+            onClick={() => setFilter("expense")}
+            count={expenseCount}
+          />
+
         </div>
 
-        {/* Transaction list */}
-        {filtered.length === 0 ? (
-          <div style={s.empty}>
-            <p style={{ fontSize: '48px' }}>📭</p>
-            <p style={{ fontWeight: 600, color: '#374151', fontSize: '16px' }}>
-              {transactions.length === 0 ? 'No transactions yet' : 'No results found'}
-            </p>
-            <p style={{ color: '#9CA3AF', fontSize: '14px' }}>
-              {transactions.length === 0
-                ? 'Click "+ Add Transaction" to get started'
-                : 'Try a different search or filter'}
-            </p>
+        {/* Transaction List */}
+
+        {filteredTransactions.length === 0 ? (
+
+          <div style={styles.empty}>
+            <p style={{ fontSize: 40 }}>📭</p>
+            <p>No transactions found</p>
           </div>
+
         ) : (
-          filtered.map(t => (
-            <TransactionCard key={t.id} transaction={t}
-              headers={headers} onUpdate={fetchAll} />
+
+          filteredTransactions.map(t => (
+            <TransactionCard
+              key={t.id}
+              transaction={t}
+              headers={headers}
+              onUpdate={fetchAll}
+            />
           ))
+
         )}
+
       </div>
 
       {showAdd && (
-        <AddTransaction headers={headers}
+        <AddTransaction
+          headers={headers}
           onClose={() => setShowAdd(false)}
-          onAdd={() => { fetchAll(); setShowAdd(false); }} />
+          onAdd={() => {
+            fetchAll();
+            setShowAdd(false);
+          }}
+        />
       )}
+
     </div>
   );
 }
 
-const s = {
-  page: { minHeight: '100vh', background: '#F3F4F6' },
-  navbar: { background: 'white', padding: '14px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', position: 'sticky', top: 0, zIndex: 100 },
-  logo: { fontWeight: 800, fontSize: '20px', color: '#064E3B' },
-  greeting: { color: '#6B7280', fontSize: '14px' },
-  logoutBtn: { padding: '7px 16px', border: '1.5px solid #E5E7EB', borderRadius: '8px', background: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: 600 },
-  container: { maxWidth: '1100px', margin: '0 auto', padding: '28px 20px' },
-  kpiRow: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' },
-  kpiCard: { background: 'white', borderRadius: '12px', padding: '20px', boxShadow: '0 1px 6px rgba(0,0,0,0.08)' },
-  kpiValue: { fontSize: '24px', fontWeight: 800, marginBottom: '6px' },
-  kpiLabel: { fontSize: '13px', color: '#6B7280', fontWeight: 500 },
-  topBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' },
-  heading: { margin: 0, color: '#111827', fontSize: '20px', fontWeight: 700 },
-  actions: { display: 'flex', gap: '10px', flexWrap: 'wrap' },
-  toggleBtn: { padding: '8px 14px', background: '#EEF2FF', color: '#4338CA', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' },
-  exportBtn: { padding: '8px 14px', background: '#ECFDF5', color: '#065F46', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' },
-  addBtn: { padding: '8px 18px', background: 'linear-gradient(135deg, #064E3B, #059669)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '14px' },
-  controls: { marginBottom: '16px' },
-  search: { width: '100%', padding: '12px 16px', border: '1.5px solid #E5E7EB', borderRadius: '10px', fontSize: '15px', marginBottom: '12px', background: 'white', outline: 'none' },
-  filterRow: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
-  filterBtn: { padding: '7px 14px', borderRadius: '8px', border: '1.5px solid', cursor: 'pointer', fontWeight: 600, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' },
-  countBadge: { borderRadius: '10px', padding: '1px 7px', fontSize: '12px', fontWeight: 700 },
-  empty: { textAlign: 'center', padding: '70px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' },
+function KpiCard({ label, value, color }) {
+  return (
+    <div style={{ ...styles.kpiCard, borderTop: `4px solid ${color}` }}>
+      <div style={{ ...styles.kpiValue, color }}>
+        ₹{value.toLocaleString("en-IN")}
+      </div>
+      <div style={styles.kpiLabel}>{label}</div>
+    </div>
+  );
+}
+
+function FilterBtn({ label, active, onClick, count }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        ...styles.filterBtn,
+        background: active ? "#064E3B" : "white",
+        color: active ? "white" : "#374151"
+      }}
+    >
+      {label}
+      <span style={styles.countBadge}>{count}</span>
+    </button>
+  );
+}
+
+const styles = {
+  page: { minHeight: "100vh", background: "#F3F4F6" },
+
+  navbar: {
+    background: "white",
+    padding: "14px 28px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    boxShadow: "0 1px 4px rgba(0,0,0,0.08)"
+  },
+
+  logo: { fontWeight: 800, fontSize: 20 },
+
+  navRight: { display: "flex", gap: 16, alignItems: "center" },
+
+  logoutBtn: {
+    padding: "6px 14px",
+    borderRadius: 6,
+    border: "1px solid #ddd",
+    background: "white",
+    cursor: "pointer"
+  },
+
+  container: { maxWidth: 1100, margin: "0 auto", padding: 24 },
+
+  kpiRow: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16 },
+
+  kpiCard: { background: "white", padding: 20, borderRadius: 12 },
+
+  kpiValue: { fontSize: 22, fontWeight: 800 },
+
+  kpiLabel: { color: "#6B7280", fontSize: 13 },
+
+  topBar: {
+    display: "flex",
+    justifyContent: "space-between",
+    marginTop: 20
+  },
+
+  actions: { display: "flex", gap: 10 },
+
+  addBtn: {
+    padding: "8px 16px",
+    background: "#059669",
+    color: "white",
+    border: "none",
+    borderRadius: 6
+  },
+
+  toggleBtn: {
+    padding: "8px 16px",
+    borderRadius: 6,
+    border: "none",
+    background: "#EEF2FF"
+  },
+
+  exportBtn: {
+    padding: "8px 16px",
+    borderRadius: 6,
+    border: "none",
+    background: "#ECFDF5"
+  },
+
+  search: {
+    width: "100%",
+    padding: 12,
+    marginTop: 20,
+    borderRadius: 8,
+    border: "1px solid #E5E7EB"
+  },
+
+  filterRow: { display: "flex", gap: 8, marginTop: 12 },
+
+  filterBtn: {
+    padding: "6px 12px",
+    borderRadius: 6,
+    border: "1px solid #E5E7EB",
+    cursor: "pointer",
+    display: "flex",
+    gap: 6
+  },
+
+  countBadge: {
+    background: "#F3F4F6",
+    padding: "2px 6px",
+    borderRadius: 8,
+    fontSize: 12
+  },
+
+  empty: {
+    textAlign: "center",
+    padding: 60
+  },
+
+  loading: {
+    minHeight: "100vh",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center"
+  }
 };
 
 export default Dashboard;
